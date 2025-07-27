@@ -1,0 +1,16 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+myenv/
+env/
+venv/
+
+# OS files
+.DS_Store
+
+# Model artifacts (optional if too large)
+models/*.txt
+
