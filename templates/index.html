@@ -1,6 +1,160 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANUBISAV: Cyber Threat Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="glow">ANUBISAV</h1>
+            <p class="subtitle">Cyber Threat Analyzer // ML-Enhanced Malware Detection</p>
+        </header>
 
-{% block content %}
-    <h2>Welcome to the Home Page!</h2>
-    <p>This is the content of your index page.</p>
-{% endblock %}
+        <section class="upload-section">
+            <h2 class="section-title">Initiate Scan Protocol</h2>
+            <p>Upload a Portable Executable (PE) file for real-time threat assessment.</p>
+
+            <div id="flash-messages">
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="flash-message error">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <form id="upload-form" enctype="multipart/form-data">
+                <label for="file-upload" class="custom-file-upload button-glow">
+                    <span class="icon">&#x1F4C1;</span> Select Binary
+                </label>
+                <input id="file-upload" type="file" name="file" accept=".exe,.dll,.sys,.ocx,.scr,.cpl,.drv,.efi,.mui,.pif">
+                <span id="file-name" class="file-name-display">No file selected</span>
+                <button type="submit" class="button-glow submit-button">
+                    <span class="icon">&#x1F50D;</span> Analyze Threat
+                </button>
+            </form>
+        </section>
+
+        <section id="loading-section" class="loading-section hidden">
+            <div class="spinner"></div>
+            <p class="loading-text">Analyzing binary signature... Standby...</p>
+        </section>
+
+        <section id="result-section" class="result-section hidden">
+            <h2 class="section-title">Analysis Report</h2>
+            <div class="result-card">
+                <p><strong>File:</strong> <span id="result-filename"></span></p>
+                <p><strong>Threat Score:</strong> <span id="result-score"></span></p>
+                <p><strong>Classification:</strong> <span id="result-label" class="prediction-label"></span></p>
+            </div>
+            <button id="reset-button" class="button-glow reset-button">
+                <span class="icon">&#x21BB;</span> New Scan
+            </button>
+        </section>
+
+        <footer class="footer">
+            <p class="warning-text">
+                <span class="icon">&#x26A0;</span> <strong>WARNING:</strong> This is a demonstration environment.
+                Do NOT upload sensitive or potentially malicious files to a public server.
+                Direct handling of unknown binaries carries inherent risks.
+            </p>
+            <p class="footer-text">ANUBISAV // Secure Systems Initiative &copy; 2025</p>
+        </footer>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file-upload');
+        const fileNameDisplay = document.getElementById('file-name');
+        const loadingSection = document.getElementById('loading-section');
+        const resultSection = document.getElementById('result-section');
+        const resultFilename = document.getElementById('result-filename');
+        const resultScore = document.getElementById('result-score');
+        const resultLabel = document.getElementById('result-label');
+        const resetButton = document.getElementById('reset-button');
+        const flashMessages = document.getElementById('flash-messages');
+
+        // Function to clear flash messages
+        function clearFlashMessages() {
+            flashMessages.innerHTML = '';
+        }
+
+        // Display selected file name
+        fileInput.addEventListener('change', function() {
+            clearFlashMessages(); // Clear messages on new file selection
+            const fileName = this.files[0] ? this.files[0].name : 'No file selected';
+            fileNameDisplay.textContent = fileName;
+            // Hide results if a new file is chosen after a scan
+            resultSection.classList.add('hidden');
+        });
+
+        // Handle form submission
+        uploadForm.addEventListener('submit', async function(event) {
+            event.preventDefault(); // Prevent default form submission
+            clearFlashMessages();
+
+            if (!fileInput.files.length) {
+                flashMessages.innerHTML = '<div class="flash-message error">Please select a file to upload.</div>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            loadingSection.classList.remove('hidden'); // Show loading spinner
+            resultSection.classList.add('hidden'); // Hide previous results
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Success
+                    resultFilename.textContent = data.filename;
+                    resultScore.textContent = data.score !== null ? data.score.toFixed(6) : 'N/A';
+                    resultLabel.textContent = data.label;
+
+                    // Apply dynamic styling based on prediction label
+                    resultLabel.classList.remove('malicious', 'benign', 'unknown');
+                    if (data.label === 'Malicious') {
+                        resultLabel.classList.add('malicious');
+                    } else if (data.label === 'Benign') {
+                        resultLabel.classList.add('benign');
+                    } else {
+                        resultLabel.classList.add('unknown');
+                    }
+
+                    resultSection.classList.remove('hidden'); // Show results
+                } else {
+                    // Error from server
+                    const errorMessage = data.error || 'An unknown error occurred on the server.';
+                    flashMessages.innerHTML = `<div class="flash-message error">${errorMessage}</div>`;
+                }
+            } catch (error) {
+                // Network or parsing error
+                console.error('Fetch error:', error);
+                flashMessages.innerHTML = `<div class="flash-message error">Network error or server unreachable: ${error.message}</div>`;
+            } finally {
+                loadingSection.classList.add('hidden'); // Hide loading spinner
+            }
+        });
+
+        // Reset button functionality
+        resetButton.addEventListener('click', function() {
+            fileInput.value = ''; // Clear file input
+            fileNameDisplay.textContent = 'No file selected';
+            resultSection.classList.add('hidden'); // Hide results
+            clearFlashMessages(); // Clear any messages
+        });
+    </script>
+</body>
+</html>

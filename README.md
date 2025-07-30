@@ -3,3 +3,6 @@ To test the model, place it at `models/ember_model_2018.txt`.
 
 To test the model for some binary:
 `python app/model.py -m models/ember_model_2018.txt [BINARIES]`
+
+### Setup instructions
+
