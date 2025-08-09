@@ -1,12 +1,12 @@
-import psutil
+import psutil, os
 from tkinter import *
 import tkinter as tk
 from tkinter import ttk, font
 from PIL import  ImageTk,Image
-thisPage = 2
+thisPage = 4
 
 root = Tk()
-root.title("Anubis Antivirus")
+root.title("Anubis endpoint")
 root.geometry("1270x720")
 
 
@@ -59,17 +59,17 @@ def leaveMenuButtons(event, i):
     elif (i == 1):
         # Orgional place
         root.after(50)
-        buttonsMain[i].config(font=("Lucida Sans", 12, "bold"), fg=active_color, bg=backgroundColor)
+        buttonsMain[i].config(font=("Lucida Sans", 12), fg=not_active_color, bg=backgroundColor)
         buttonsMain[i].place(relx=0.075, rely=0.45)
     elif (i == 2):
         # Orgional place
         root.after(50)
-        buttonsMain[i].config(font=("Lucida Sans", 12), fg=not_active_color, bg=backgroundColor)
+        buttonsMain[i].config(font=("Lucida Sans", 12, "bold"), fg=not_active_color, bg=backgroundColor)
         buttonsMain[i].place(relx=0.075, rely=0.50)
     elif (i == 3):
         # Orgional place
         root.after(50)
-        buttonsMain[i].config(font=("Lucida Sans", 12), fg=not_active_color, bg=backgroundColor)
+        buttonsMain[i].config(font=("Lucida Sans", 12), fg=active_color, bg=backgroundColor)
         buttonsMain[i].place(relx=0.078, rely=0.55)
     elif (i == 4):
         # Orgional place
@@ -95,40 +95,20 @@ def nextPage(i):
         root.destroy()
         import page5
 
+def update_label(label):
+# This for inilizting the CPU Perecnt
+    cpu_usage = psutil.cpu_percent(interval=0.1)
+    ram_usage = psutil.virtual_memory().percent
+    cpu_freq = psutil.cpu_freq(percpu=False)
+# This to make it appear
+    info_text = f"CPU Usage: {cpu_usage}%\nRAM Usage: {ram_usage}%\nCPU Freq: {cpu_freq}\n\n\n\n\n\n\n(Everything under control)"
 
-def scanner():
-    def update_progress_label(value):
-        return f"Current Progress: {value}%"
-    def progress(value):
-        if value <= 100:
-            progress_bar['value'] = value
-            label.config(text=update_progress_label(value))
-            root.after(1000, lambda: progress(value + 10))
-        else:
-            progress_bar.stop()
+    label.config(text=info_text)
 
-    top = Toplevel()
-    top.title("Scanning")
-    top.geometry("600x600")
-    top.configure(bg="#131314")
-    progress_bar = ttk.Progressbar(top, orient='horizontal', mode='determinate', length=400)
-    progress_bar.place(relx= 0.15,rely=0.35)
-    label = Label(top, text=update_progress_label(0), font=("Lucida Sans",12), fg= active_color, bg= backgroundColor)
-    label.place(relx=0.33, rely=0.4)
-    start_button = Button(top, text="Progress", fg=active_color, bg=backgroundColor, font=("Lucida Sans",12), command=lambda: progress(0))
-    start_button.place(relx=0.4, rely=0.45)
+    root.after(300, lambda: update_label(label))
 
 
-
-
-
-
-
-
-
-
-
-image_frame = ImageTk.PhotoImage(Image.open("1x/Panel.png"))
+image_frame = ImageTk.PhotoImage(Image.open("../assets/1x/Panel.png"))
 main_frame = tk.Frame(root,bg="black")
 main_frame.pack(side=tk.LEFT, fill=tk.Y)
 main_frame.pack_propagate(FALSE)
@@ -136,13 +116,6 @@ main_frame.configure(width=275,height=720)
 
 label = Label(main_frame, image= image_frame, borderwidth=0)
 label.pack()
-
-# SCAN box
-img_scan = ImageTk.PhotoImage(Image.open("1x/scan.png"))
-#Label(root, image= img_scan,  borderwidth=0).place(relx= 0.34, rely=0.15)
-button_scan = Button(root,image=img_scan,bg=backgroundColor,width=671, borderwidth=0, height=436 , command= scanner, activebackground=backgroundColor).place(relx=0.35, rely=0.16)
-
-
 
 
 
@@ -181,6 +154,23 @@ desAnti.place(
 
 
 
+# Flawlessly img
+img_flaw = ImageTk.PhotoImage(Image.open("../assets/1x/flaw.png"))
+flaw_label = Label(root, image= img_flaw, background= backgroundColor).place(relx=.36, rely=.03)
+
+# Label Big
+img_box = ImageTk.PhotoImage(Image.open("../assets/1x/extreme.png"))
+box_label= Label (root, image = img_box, background= backgroundColor).place(relx= 0.369, rely=0.47)
+
+# CPU & RAM Information:
+info_label = Label(root, bg= backgroundColor, fg= active_color, font=("Lucida Sans",12,"bold"),justify=LEFT)
+info_label.place(
+    relx=0.4,
+    rely=0.517
+)
+
+update_label(info_label)
+
 # Nav buttons
 buttonsMain = ["button_monitoring","button_security","button_update","button_task","button_license" ]
 
@@ -207,8 +197,8 @@ buttonsMain[0].place(
 buttonsMain[1] = Button(
     root,
     text="Security",
-    font=("Lucida Sans",12, "bold"),
-    fg=active_color,
+    font=("Lucida Sans",12),
+    fg=not_active_color,
     bg= backgroundColor,
     activebackground=backgroundColor,
     highlightthickness=0,
@@ -245,8 +235,8 @@ buttonsMain[2].place(
 buttonsMain[3] = Button(
     root,
     text="Tasks",
-    font=("Lucida Sans",12),
-    fg=not_active_color,
+    font=("Lucida Sans",12, "bold"),
+    fg=active_color,
     bg= backgroundColor,
     activebackground=backgroundColor,
     highlightthickness=0,

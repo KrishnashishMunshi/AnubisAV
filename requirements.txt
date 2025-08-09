@@ -1,0 +1,6 @@
+numpy
+pefile
+signify
+scikit-learn
+polars
+huggingface_hub

@@ -13,4 +13,5 @@ venv/
 
 # Model artifacts (optional if too large)
 models/*.txt
+models/*.model
 

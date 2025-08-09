@@ -133,7 +133,7 @@ def nextPage(i):
         import page5
 
 
-image_frame = ImageTk.PhotoImage(Image.open("1x/Panel.png"))
+image_frame = ImageTk.PhotoImage(Image.open("../assets/1x/Panel.png"))
 main_frame = tk.Frame(root,bg="black")
 main_frame.pack(side=tk.LEFT, fill=tk.Y)
 main_frame.pack_propagate(FALSE)
@@ -142,7 +142,7 @@ main_frame.configure(width=275,height=720)
 label = Label(main_frame, image= image_frame, borderwidth=0)
 label.pack()
 
-imgAnti = ImageTk.PhotoImage(Image.open("1x/AntiPanel.png"))
+imgAnti = ImageTk.PhotoImage(Image.open("../assets/1x/AntiPanel.png"))
 
 canvas = Canvas(root, bg="#131314", highlightthickness=0)
 
@@ -173,7 +173,7 @@ C.place(
 )
 
 
-boxImage= ImageTk.PhotoImage(Image.open("1x/box.png"))
+boxImage= ImageTk.PhotoImage(Image.open("../assets/1x/box.png"))
 
 # The first row that contains Mid size
 
@@ -200,7 +200,7 @@ labelBox3.place(
 
 
 
-bigBoxImage= ImageTk.PhotoImage(Image.open("1x/bigBox.png"))
+bigBoxImage= ImageTk.PhotoImage(Image.open("../assets/1x/bigBox.png"))
 
 # For the big Box in the left
 labelBig = Label(root,bg="#131314",image= bigBoxImage, borderwidth=0)
@@ -219,7 +219,7 @@ desc_big.place(relx=.33,rely=0.69)
 
 
 
-tinyImage= ImageTk.PhotoImage(Image.open("1x/boxTiny.png"))
+tinyImage= ImageTk.PhotoImage(Image.open("../assets/1x/boxTiny.png"))
 
 # For the two small boxes in the right
 
@@ -243,7 +243,7 @@ text_tiny = Label(root,text="Application Activity\nMonitor", bg="#131314", fg=ac
 text_tiny.place(relx = 0.72, rely=0.66)
 
 # Application icon
-app_img = ImageTk.PhotoImage(Image.open("1x/icon4.png"))
+app_img = ImageTk.PhotoImage(Image.open("../assets/1x/icon4.png"))
 Label(root,image=app_img, bg= backgroundColor).place(relx=0.848,rely=0.658)
 
 
@@ -260,7 +260,7 @@ text_tiny2 = Label(root,text="Network Monitor", bg="#131314", fg=active_color, b
 text_tiny2.place(relx = 0.72, rely=0.8)
 
 # Network icon
-net_img = ImageTk.PhotoImage(Image.open("1x/icon5.png"))
+net_img = ImageTk.PhotoImage(Image.open("../assets/1x/icon5.png"))
 Label(root,image=net_img, bg= backgroundColor).place(relx=0.848,rely=0.787)
 
 
@@ -274,7 +274,7 @@ text_Info.place(
 )
 
 # Icon for Report
-report_img = ImageTk.PhotoImage(Image.open("1x/icon1.png"))
+report_img = ImageTk.PhotoImage(Image.open("../assets/1x/icon1.png"))
 
 Label(root,image=report_img, bg= box_background).place(relx=0.458,rely=0.45)
 
@@ -296,7 +296,7 @@ button_Info2.place(
 )
 
 # Icon for Backup
-backup_img = ImageTk.PhotoImage(Image.open("1x/icon2.png"))
+backup_img = ImageTk.PhotoImage(Image.open("../assets/1x/icon2.png"))
 
 Label(root,image=backup_img, bg= box_background).place(relx=0.65,rely=0.45)
 
@@ -324,7 +324,7 @@ text_Info3.place(
 )
 
 # Icon for Threat
-threat_img = ImageTk.PhotoImage(Image.open("1x/icon3.png"))
+threat_img = ImageTk.PhotoImage(Image.open("../assets/1x/icon3.png"))
 
 Label(root,image=threat_img, bg= box_background).place(relx=0.848,rely=0.45)
 
