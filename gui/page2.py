@@ -3,10 +3,10 @@ from tkinter import *
 import tkinter as tk
 from tkinter import ttk, font
 from PIL import  ImageTk,Image
-thisPage = 3
+thisPage = 2
 
 root = Tk()
-root.title("Anubis endpoint")
+root.title("Anubis Antivirus")
 root.geometry("1270x720")
 
 
@@ -59,12 +59,12 @@ def leaveMenuButtons(event, i):
     elif (i == 1):
         # Orgional place
         root.after(50)
-        buttonsMain[i].config(font=("Lucida Sans", 12), fg=not_active_color, bg=backgroundColor)
+        buttonsMain[i].config(font=("Lucida Sans", 12, "bold"), fg=active_color, bg=backgroundColor)
         buttonsMain[i].place(relx=0.075, rely=0.45)
     elif (i == 2):
         # Orgional place
         root.after(50)
-        buttonsMain[i].config(font=("Lucida Sans", 12, "bold"), fg=active_color, bg=backgroundColor)
+        buttonsMain[i].config(font=("Lucida Sans", 12), fg=not_active_color, bg=backgroundColor)
         buttonsMain[i].place(relx=0.075, rely=0.50)
     elif (i == 3):
         # Orgional place
@@ -96,7 +96,39 @@ def nextPage(i):
         import page5
 
 
-image_frame = ImageTk.PhotoImage(Image.open("1x/Panel.png"))
+def scanner():
+    def update_progress_label(value):
+        return f"Current Progress: {value}%"
+    def progress(value):
+        if value <= 100:
+            progress_bar['value'] = value
+            label.config(text=update_progress_label(value))
+            root.after(1000, lambda: progress(value + 10))
+        else:
+            progress_bar.stop()
+
+    top = Toplevel()
+    top.title("Scanning")
+    top.geometry("600x600")
+    top.configure(bg="#131314")
+    progress_bar = ttk.Progressbar(top, orient='horizontal', mode='determinate', length=400)
+    progress_bar.place(relx= 0.15,rely=0.35)
+    label = Label(top, text=update_progress_label(0), font=("Lucida Sans",12), fg= active_color, bg= backgroundColor)
+    label.place(relx=0.33, rely=0.4)
+    start_button = Button(top, text="Progress", fg=active_color, bg=backgroundColor, font=("Lucida Sans",12), command=lambda: progress(0))
+    start_button.place(relx=0.4, rely=0.45)
+
+
+
+
+
+
+
+
+
+
+
+image_frame = ImageTk.PhotoImage(Image.open("../assets/1x/Panel.png"))
 main_frame = tk.Frame(root,bg="black")
 main_frame.pack(side=tk.LEFT, fill=tk.Y)
 main_frame.pack_propagate(FALSE)
@@ -104,6 +136,14 @@ main_frame.configure(width=275,height=720)
 
 label = Label(main_frame, image= image_frame, borderwidth=0)
 label.pack()
+
+# SCAN box
+img_scan = ImageTk.PhotoImage(Image.open("../assets/1x/scan.png"))
+#Label(root, image= img_scan,  borderwidth=0).place(relx= 0.34, rely=0.15)
+button_scan = Button(root,image=img_scan,bg=backgroundColor,width=671, borderwidth=0, height=436 , command= scanner, activebackground=backgroundColor).place(relx=0.35, rely=0.16)
+
+
+
 
 
 # The Name of the Program
@@ -140,20 +180,6 @@ desAnti.place(
 )
 
 
-# Updated img
-img_update = ImageTk.PhotoImage(Image.open("1x/dated.png"))
-update_label = Label(root, image= img_update, background= backgroundColor).place(relx=.7, rely=.03)
-
-# Label verison
-
-img_box = ImageTk.PhotoImage(Image.open("1x/bigBox.png"))
-box_label= Label (root, image = img_box, background= backgroundColor).place(relx= 0.27, rely=0.068)
-
-text_label = Label(root, text="Version No.",font=("Lucida Sans",16,"bold"), background=backgroundColor, fg= active_color).place(relx =0.3, rely = 0.12)
-
-desc_label = Label(root, text="1.00.01          03/08/2025",font=("Lucida Sans",9,"bold"), background=backgroundColor, fg= not_active_color).place(relx =0.31, rely = 0.16)
-
-
 
 # Nav buttons
 buttonsMain = ["button_monitoring","button_security","button_update","button_task","button_license" ]
@@ -181,8 +207,8 @@ buttonsMain[0].place(
 buttonsMain[1] = Button(
     root,
     text="Security",
-    font=("Lucida Sans",12),
-    fg=not_active_color,
+    font=("Lucida Sans",12, "bold"),
+    fg=active_color,
     bg= backgroundColor,
     activebackground=backgroundColor,
     highlightthickness=0,
@@ -199,8 +225,8 @@ buttonsMain[1].place(
 buttonsMain[2] = Button(
     root,
     text="Update",
-    font=("Lucida Sans",12, "bold"),
-    fg=active_color,
+    font=("Lucida Sans",12),
+    fg=not_active_color,
     bg= backgroundColor,
     activebackground=backgroundColor,
     highlightthickness=0,
