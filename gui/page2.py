@@ -1,302 +1,397 @@
-import psutil
-from tkinter import *
 import tkinter as tk
-from tkinter import ttk, font
-from PIL import  ImageTk,Image
-thisPage = 2
+from tkinter import filedialog, ttk
+import platform
+import psutil
+import threading
+import time
+import random
+from PIL import ImageTk, Image
 
-root = Tk()
+class AnubisApp:
+    """
+    An object-oriented approach to the Anubis Antivirus GUI application.
+    This class encapsulates all the UI elements, state, and logic.
+    It is designed to be a component that can be placed inside a parent frame.
+    """
+    def __init__(self, parent_frame, root_window):
+        # We need both the parent frame to place widgets and the root window
+        # to schedule updates with `after`.
+        self.parent_frame = parent_frame
+        self.root = root_window
+        
+        self.setup_constants()
+        self.setup_variables()
+        self.setup_ui()
+        self.start_background_tasks()
+
+    def setup_constants(self):
+        """Define fonts, colors, and other static values."""
+        self.TITLE_FONT = ("Orbitron", 28, "bold")
+        self.SCORE_FONT = ("Orbitron", 48, "bold")
+        self.SUB_FONT = ("Orbitron", 14)
+        self.STATUS_FONT = ("Orbitron", 12, "italic")
+        self.LOG_FONT = ("Consolas", 10)
+        self.TEXT_COLOR = "#00ffe1"
+        self.RING_COLOR = "#00fff2"
+        self.ALERT_RING_COLOR = "#ff0033"
+        self.WAVE_COLOR = "#009fbd"
+        self.SAFE_COLOR = "#2ecc71"
+        self.WARN_COLOR = "#f1c40f"
+        self.THREAT_COLOR = "#e74c3c"
+        self.BG_COLOR = '#0a0f1c'
+        self.LOG_BG_COLOR = '#0d1426'
+        self.LOG_MESSAGES = [
+            "Initializing scan engine...",
+            "Loading signature database...",
+            "Analyzing file headers...",
+            "Checking for known vulnerabilities...",
+            "Scanning for suspicious patterns...",  
+            "Scanning for known malware patterns...",
+            "Performing heuristic analysis...",
+            "Checking for polymorphic code...",
+            "Analyzing memory allocation...",
+            "Decompressing archives for inspection...",
+            "Finalizing report...",
+        ]
+
+    def setup_variables(self):
+        """Initialize all the dynamic state variables for the application."""
+        self.angle = 0
+        self.system_name = platform.system()
+        self.selected_file = None
+        self.threat_detected = False
+        self.title_pulse_state = 0
+        self.is_scanning = False
+
+    def setup_ui(self):
+        """Configure the main window and create all UI widgets."""
+        
+        # --- Main Canvas for animations ---
+        self.canvas = tk.Canvas(self.parent_frame, width=720, height=720, bg=self.BG_COLOR, highlightthickness=0)
+        self.canvas.place(relx=0.5, rely=0.5, anchor='center')
+        self.center_x, self.center_y = 360, 360
+        self.radius = 150
+
+        # Static background ring
+        self.canvas.create_oval(self.center_x - self.radius, self.center_y - self.radius,
+                                 self.center_x + self.radius, self.center_y + self.radius,
+                                 outline="#222", width=10)
+        # Animated Progress Ring (initially hidden)
+        self.progress_ring = self.canvas.create_arc(self.center_x - self.radius, self.center_y - self.radius,
+                                                     self.center_x + self.radius, self.center_y + self.radius,
+                                                     start=90, extent=0, outline=self.RING_COLOR, width=8, style=tk.ARC)
+
+        # --- Canvas Text Elements ---
+        self.score_text = self.canvas.create_text(self.center_x, self.center_y, text="--", fill=self.TEXT_COLOR, font=self.SCORE_FONT)
+        self.status_text = self.canvas.create_text(self.center_x, self.center_y + 60, text="IDLE", fill=self.TEXT_COLOR, font=self.STATUS_FONT)
+        self.cpu_text = self.canvas.create_text(self.center_x, self.center_y + 210, text="", fill=self.TEXT_COLOR, font=self.SUB_FONT)
+        self.ram_text = self.canvas.create_text(self.center_x, self.center_y + 240, text="", fill=self.TEXT_COLOR, font=self.SUB_FONT)
+        self.os_text = self.canvas.create_text(self.center_x, self.center_y + 270, text=f"OS: {self.system_name}", fill=self.TEXT_COLOR, font=self.SUB_FONT)
+
+        # Animated waveform line
+        self.wave_base_y = self.center_y + 310
+        self.wave = self.canvas.create_line(self.center_x - 100, self.wave_base_y, self.center_x + 100, self.wave_base_y, fill=self.WAVE_COLOR, width=3, smooth=True)
+
+        # --- Top UI Elements ---
+        self.scanner_title = tk.Label(self.parent_frame, text="Anubis Antivirus", font=self.TITLE_FONT, bg=self.BG_COLOR, fg=self.TEXT_COLOR)
+        self.scanner_title.pack(pady=5)
+        self.file_label = tk.Label(self.parent_frame, text="No file selected.", font=self.SUB_FONT, bg=self.BG_COLOR, fg=self.TEXT_COLOR)
+        self.file_label.pack(pady=5)
+
+        # --- Analysis Log Widget ---
+        self.log_frame = tk.Frame(self.parent_frame, bg=self.LOG_BG_COLOR)
+        self.log_frame.pack(pady=10, padx=20, fill="x")
+        self.log_text = tk.Text(self.log_frame, height=6, bg=self.LOG_BG_COLOR, fg=self.TEXT_COLOR,
+                                 font=self.LOG_FONT, relief="flat", insertbackground=self.TEXT_COLOR)
+        self.log_text.pack(side="left", fill="x", expand=True, padx=5, pady=5)
+        self.log_text.config(state="disabled")
+
+        # --- Bottom UI Elements ---
+        self.result_label = tk.Label(self.parent_frame, text="", font=self.SUB_FONT, bg=self.BG_COLOR, fg=self.TEXT_COLOR)
+        self.result_label.pack(side="bottom", pady=10)
+        
+        btn_frame = tk.Frame(self.parent_frame, bg=self.BG_COLOR)
+        btn_frame.pack(side="bottom", pady=10)
+        
+        self.select_file_btn = tk.Button(btn_frame, text="SELECT FILE", command=self.select_file,
+                                         font=self.SUB_FONT, bg="#001d33", fg=self.TEXT_COLOR,
+                                         activebackground="#003e52", activeforeground=self.TEXT_COLOR,
+                                         width=15, relief="flat", borderwidth=2)
+        self.select_file_btn.pack(side="left", padx=10)
+
+        self.quick_scan_btn = tk.Button(btn_frame, text="QUICK SCAN", command=lambda: self.start_scan("quick"),
+                                       font=self.SUB_FONT, bg="#003322", fg=self.TEXT_COLOR,
+                                       activebackground="#005232", activeforeground=self.TEXT_COLOR,
+                                       width=15, relief="flat", borderwidth=2, state="disabled")
+        self.quick_scan_btn.pack(side="left", padx=10)
+
+        self.full_scan_btn = tk.Button(btn_frame, text="FULL SCAN", command=lambda: self.start_scan("full"),
+                                       font=self.SUB_FONT, bg="#332200", fg=self.TEXT_COLOR,
+                                       activebackground="#523200", activeforeground=self.TEXT_COLOR,
+                                       width=15, relief="flat", borderwidth=2, state="disabled")
+        self.full_scan_btn.pack(side="left", padx=10)
+
+    def start_background_tasks(self):
+        threading.Thread(target=self.update_metrics, daemon=True).start()
+        self.rotate_ring()
+        self.update_wave()
+        self.pulse_title()
+
+    def update_metrics(self):
+        while True:
+            try:
+                cpu = psutil.cpu_percent()
+                ram = psutil.virtual_memory().percent
+                self.canvas.itemconfig(self.cpu_text, text=f"CPU Usage: {cpu}%")
+                self.canvas.itemconfig(self.ram_text, text=f"RAM Usage: {ram}%")
+                time.sleep(1)
+            except tk.TclError:
+                # Catch TclError which occurs when the widget is destroyed
+                break
+
+    def rotate_ring(self):
+        if not self.parent_frame.winfo_exists():
+            return
+        
+        self.canvas.delete("rotating_ring")
+        self.angle = (self.angle + 4) % 360
+        
+        x1, y1 = self.center_x - self.radius * 1.2, self.center_y - self.radius * 1.2
+        x2, y2 = self.center_x + self.radius * 1.2, self.center_y + self.radius * 1.2
+        
+        if self.is_scanning or self.threat_detected:
+            self.canvas.create_arc(x1, y1, x2, y2, start=self.angle, extent=60,
+                                     outline=self.ALERT_RING_COLOR if self.threat_detected else self.WARN_COLOR, 
+                                     style="arc", width=4, tags="rotating_ring")
+        self.root.after(50, self.rotate_ring)
+
+    def update_wave(self):
+        if not self.parent_frame.winfo_exists():
+            return
+            
+        amplitude = 5
+        color = self.WAVE_COLOR
+        if self.is_scanning:
+            amplitude = 15
+            color = self.WARN_COLOR
+        if self.threat_detected:
+            amplitude = 25
+            color = self.ALERT_RING_COLOR
+        
+        points = [item for i in range(50) for item in (self.center_x - 100 + i * 4, self.wave_base_y + random.randint(-amplitude, amplitude))]
+        self.canvas.coords(self.wave, *points)
+        self.canvas.itemconfig(self.wave, fill=color)
+        self.root.after(100, self.update_wave)
+
+    def pulse_title(self):
+        if not self.parent_frame.winfo_exists():
+            return
+            
+        self.title_pulse_state = 1 - self.title_pulse_state
+        self.scanner_title.config(fg="#00ffe1" if self.title_pulse_state == 0 else "#33fff8")
+        self.root.after(1000, self.pulse_title)
+
+    def select_file(self):
+        if self.is_scanning: return
+        self.selected_file = filedialog.askopenfilename()
+        if self.selected_file:
+            self.file_label.config(text=f"File: {self.selected_file.split('/')[-1]}")
+            self.quick_scan_btn.config(state="normal")
+            self.full_scan_btn.config(state="normal")
+            self.reset_ui(keep_filename=True)
+
+    def start_scan(self, scan_type):
+        if self.is_scanning: return
+        self.reset_ui(keep_filename=True)
+        self.is_scanning = True
+        self.toggle_buttons(False)
+        self.canvas.itemconfig(self.status_text, text="ANALYZING...")
+        
+        scan_speed = 0.01 if scan_type == "quick" else 0.03
+        threading.Thread(target=self.simulate_scan, args=(scan_speed,), daemon=True).start()
+        threading.Thread(target=self.update_log, args=(scan_speed,), daemon=True).start()
+
+    def simulate_scan(self, speed):
+        for i in range(101):
+            if not self.is_scanning: break
+            time.sleep(speed)
+            progress_angle = i * 3.6
+            self.canvas.itemconfig(self.progress_ring, extent=progress_angle)
+            self.canvas.itemconfig(self.score_text, text=f"{i}%")
+        
+        if self.is_scanning:
+            threat_score = random.randint(0, 100)
+            self.root.after(0, self.display_scan_results, threat_score)
+        else:
+            self.root.after(0, self.reset_ui)
+
+    def update_log(self, speed):
+        self.log_text.config(state="normal")
+        self.log_text.delete('1.0', tk.END)
+        for message in self.LOG_MESSAGES:
+            if not self.is_scanning: break
+            self.log_text.insert(tk.END, f"> {message}\n")
+            self.log_text.see(tk.END)
+            time.sleep(speed * 10)
+        self.log_text.config(state="disabled")
+
+    def display_scan_results(self, score):
+        self.is_scanning = False
+        self.toggle_buttons(True)
+        self.threat_detected = score > 70
+
+        score_color = self.SAFE_COLOR
+        if 40 <= score <= 70: score_color = self.WARN_COLOR
+        elif score > 70: score_color = self.THREAT_COLOR
+        self.canvas.itemconfig(self.score_text, text=f"{score}", fill=score_color)
+
+        if self.threat_detected:
+            self.canvas.itemconfig(self.status_text, text="THREAT DETECTED", fill=self.THREAT_COLOR)
+            self.result_label.config(text="Action Required: Threat has been quarantined.", fg=self.THREAT_COLOR)
+        else:
+            self.canvas.itemconfig(self.status_text, text="SYSTEM SECURE", fill=self.SAFE_COLOR)
+            self.result_label.config(text="Scan complete. No threats were found.", fg=self.SAFE_COLOR)
+
+    def reset_ui(self, keep_filename=False):
+        self.threat_detected = False
+        self.is_scanning = False
+        self.canvas.itemconfig(self.progress_ring, extent=0)
+        self.canvas.itemconfig(self.score_text, text="--", fill="#00ffe1")
+        self.canvas.itemconfig(self.status_text, text="IDLE", fill="#00ffe1")
+        self.result_label.config(text="")
+        if not keep_filename:
+            self.file_label.config(text="No file selected.")
+            self.selected_file = None
+            self.quick_scan_btn.config(state="disabled")
+            self.full_scan_btn.config(state="disabled")
+            
+        self.toggle_buttons(True)
+
+    def toggle_buttons(self, enabled):
+        state = "normal" if enabled else "disabled"
+        self.select_file_btn.config(state=state)
+        if self.selected_file:
+            self.quick_scan_btn.config(state=state)
+            self.full_scan_btn.config(state=state)
+        # Re-enable the quick and full scan buttons if a file is selected and scan is not active
+        if self.selected_file and enabled:
+            self.quick_scan_btn.config(state="normal")
+            self.full_scan_btn.config(state="normal")
+
+
+# --- Main Application Setup ---
+
+root = tk.Tk()
 root.title("Anubis Antivirus")
 root.geometry("1270x720")
-
-
 root.minsize(1270,720)
 root.maxsize(1270,720)
 root.configure(bg="#131314")
 
-
-#  Colors
+# Colors
 backgroundColor = "#131314"
 not_active_color = "#606060"
 active_color = "#DCDCDD"
 box_background = "#26262C"
 
+# --- Page Management ---
+pages = {}
+current_page_frame = None
+
+def clear_page():
+    """Destroys all widgets in the content area."""
+    global current_page_frame
+    if current_page_frame:
+        current_page_frame.destroy()
+        current_page_frame = None
+
+def show_page(page_name):
+    """Switches to the specified page."""
+    clear_page()
+    global current_page_frame
+    
+    # Create the new page frame
+    current_page_frame = tk.Frame(root, bg=backgroundColor)
+    current_page_frame.place(relx=0.25, rely=0.0, relwidth=0.75, relheight=1.0)
+    
+    if page_name == "security":
+        # Instantiate the AnubisApp within the new frame
+        AnubisApp(current_page_frame, root)
+    elif page_name == "monitoring":
+        tk.Label(current_page_frame, text="Monitoring Page Content", bg=backgroundColor, fg=active_color, font=("Lucida Sans", 24)).pack(pady=50)
+    elif page_name == "update":
+        tk.Label(current_page_frame, text="Update Page Content", bg=backgroundColor, fg=active_color, font=("Lucida Sans", 24)).pack(pady=50)
+    elif page_name == "tasks":
+        tk.Label(current_page_frame, text="Tasks Page Content", bg=backgroundColor, fg=active_color, font=("Lucida Sans", 24)).pack(pady=50)
+    elif page_name == "license":
+        tk.Label(current_page_frame, text="License Page Content", bg=backgroundColor, fg=active_color, font=("Lucida Sans", 24)).pack(pady=50)
 
 # For the Nav buttons
-def hoverMenuButtons(event,i):
+def hoverMenuButtons(event, i):
     global buttonsMain
-
-    if (i == 0):
-        # Mont
-        buttonsMain[i].config(font=("Lucida Sans",16,"bold"),bg=backgroundColor, fg="#DEDEE0", activeforeground="#5A5A5B")
-        buttonsMain[i].place(relx=0.05,rely=0.4)
-
-    elif (i == 1):
-        # Sec
-        buttonsMain[i].config(font=("Lucida Sans",16,"bold"),bg=backgroundColor, fg="#DEDEE0", activeforeground="#5A5A5B")
-        buttonsMain[i].place(relx=0.064,rely=0.44)
-    elif (i == 2):
-        # Update
-        buttonsMain[i].config(font=("Lucida Sans",16,"bold"),bg=backgroundColor, fg="#DEDEE0", activeforeground="#5A5A5B")
-        buttonsMain[i].place(relx=0.065,rely=0.49)
-    elif (i == 3):
-        # Tasks
-        buttonsMain[i].config(font=("Lucida Sans",16,"bold"),bg=backgroundColor, fg="#DEDEE0", activeforeground="#5A5A5B")
-        buttonsMain[i].place(relx=0.069,rely=0.54)
-    elif (i == 4):
-        # License
-        buttonsMain[i].config(font=("Lucida Sans",16,"bold"),bg=backgroundColor, fg="#DEDEE0", activeforeground="#5A5A5B")
-        buttonsMain[i].place(relx=0.063,rely=0.58)
-
+    buttonsMain[i].config(font=("Lucida Sans", 16, "bold"), bg=backgroundColor, fg="#DEDEE0", activeforeground="#5A5A5B")
 
 def leaveMenuButtons(event, i):
     global buttonsMain
-    if (i == 0):
-        # Orgional place
-        root.after(50)
-        buttonsMain[i].config(font=("Lucida Sans", 12), fg=not_active_color, bg=backgroundColor)
-        buttonsMain[i].place(relx=0.07, rely=0.4)
-    elif (i == 1):
-        # Orgional place
-        root.after(50)
+    if i == 1: # "Security" is the active page
         buttonsMain[i].config(font=("Lucida Sans", 12, "bold"), fg=active_color, bg=backgroundColor)
-        buttonsMain[i].place(relx=0.075, rely=0.45)
-    elif (i == 2):
-        # Orgional place
-        root.after(50)
+    else:
         buttonsMain[i].config(font=("Lucida Sans", 12), fg=not_active_color, bg=backgroundColor)
-        buttonsMain[i].place(relx=0.075, rely=0.50)
-    elif (i == 3):
-        # Orgional place
-        root.after(50)
-        buttonsMain[i].config(font=("Lucida Sans", 12), fg=not_active_color, bg=backgroundColor)
-        buttonsMain[i].place(relx=0.078, rely=0.55)
-    elif (i == 4):
-        # Orgional place
-        root.after(50)
-        buttonsMain[i].config(font=("Lucida Sans", 12), fg=not_active_color, bg=backgroundColor)
-        buttonsMain[i].place(relx=0.074, rely=0.595)
 
-
+# Navigation button commands
 def nextPage(i):
-    if i == 0 and thisPage != 1:
-        root.destroy()
-        import page1
-    elif i == 1 and thisPage != 2:
-        root.destroy()
-        import page2
-    elif i == 2 and thisPage != 3:
-        root.destroy()
-        import page3
-    elif i == 3 and thisPage != 4:
-        root.destroy()
-        import page4
-    elif i == 4 and thisPage != 5:
-        root.destroy()
-        import page5
+    page_names = ["monitoring", "security", "update", "tasks", "license"]
+    show_page(page_names[i])
 
 
-def scanner():
-    def update_progress_label(value):
-        return f"Current Progress: {value}%"
-    def progress(value):
-        if value <= 100:
-            progress_bar['value'] = value
-            label.config(text=update_progress_label(value))
-            root.after(1000, lambda: progress(value + 10))
-        else:
-            progress_bar.stop()
-
-    top = Toplevel()
-    top.title("Scanning")
-    top.geometry("600x600")
-    top.configure(bg="#131314")
-    progress_bar = ttk.Progressbar(top, orient='horizontal', mode='determinate', length=400)
-    progress_bar.place(relx= 0.15,rely=0.35)
-    label = Label(top, text=update_progress_label(0), font=("Lucida Sans",12), fg= active_color, bg= backgroundColor)
-    label.place(relx=0.33, rely=0.4)
-    start_button = Button(top, text="Progress", fg=active_color, bg=backgroundColor, font=("Lucida Sans",12), command=lambda: progress(0))
-    start_button.place(relx=0.4, rely=0.45)
-
-
-
-
-
-
-
-
-
-
-
-image_frame = ImageTk.PhotoImage(Image.open("../assets/1x/Panel.png"))
-main_frame = tk.Frame(root,bg="black")
+# --- Sidebar UI ---
+main_frame = tk.Frame(root, bg="black")
 main_frame.pack(side=tk.LEFT, fill=tk.Y)
-main_frame.pack_propagate(FALSE)
-main_frame.configure(width=275,height=720)
+main_frame.pack_propagate(False)
+main_frame.configure(width=275, height=720)
 
-label = Label(main_frame, image= image_frame, borderwidth=0)
-label.pack()
-
-# SCAN box
-img_scan = ImageTk.PhotoImage(Image.open("../assets/1x/scan.png"))
-#Label(root, image= img_scan,  borderwidth=0).place(relx= 0.34, rely=0.15)
-button_scan = Button(root,image=img_scan,bg=backgroundColor,width=671, borderwidth=0, height=436 , command= scanner, activebackground=backgroundColor).place(relx=0.35, rely=0.16)
-
-
-
-
+try:
+    image_frame = ImageTk.PhotoImage(Image.open("../assets/1x/Panel.png"))
+    tk.Label(main_frame, image=image_frame, borderwidth=0).pack()
+except FileNotFoundError:
+    tk.Label(main_frame, text="Panel Image Not Found", bg="black", fg="white").pack()
 
 # The Name of the Program
-
-nameAnti = Label(
-    root,
-    text="Anubis",
-    font=('Century Gothic',30,"bold"),
-    bg=backgroundColor,
-    fg=active_color,
-    pady=0,
-    padx=0
-)
-
-nameAnti.place(
-    relx=0.02,
-    rely=0.08
-)
-
-
-desAnti = Label(
-    root,
-    text="Endpoint Security",
-    font=('Century Gothic',13),
-    bg=backgroundColor,
-    fg="#5A5A5B",
-    pady=0,
-    padx=0
-)
-
-desAnti.place(
-    relx=0.02,
-    rely=0.155
-)
-
-
+tk.Label(root, text="Anubis", font=('Century Gothic', 30, "bold"), bg=backgroundColor, fg=active_color, pady=0, padx=0).place(relx=0.02, rely=0.08)
+tk.Label(root, text="Endpoint Security", font=('Century Gothic', 13), bg=backgroundColor, fg="#5A5A5B", pady=0, padx=0).place(relx=0.02, rely=0.155)
 
 # Nav buttons
-buttonsMain = ["button_monitoring","button_security","button_update","button_task","button_license" ]
+button_info = [
+    ("Monitoring", 0.07, 0.4),
+    ("Security", 0.075, 0.45),
+    ("Update", 0.075, 0.50),
+    ("Tasks", 0.078, 0.55),
+    ("License", 0.074, 0.595)
+]
 
-buttonsMain[0] = Button(
-    root,
-    text="Monitoring",
-    font=("Lucida Sans",12),
-    fg=not_active_color,
-    bg= backgroundColor,
-    activebackground=backgroundColor,
-    highlightthickness=0,
-    borderwidth=0,
-    command=lambda: nextPage(0)
+buttonsMain = []
+for i, (text, relx, rely) in enumerate(button_info):
+    font_style = ("Lucida Sans", 12, "bold") if i == 1 else ("Lucida Sans", 12)
+    fg_color = active_color if i == 1 else not_active_color
+    
+    btn = tk.Button(
+        root,
+        text=text,
+        font=font_style,
+        fg=fg_color,
+        bg=backgroundColor,
+        activebackground=backgroundColor,
+        highlightthickness=0,
+        borderwidth=0,
+        command=lambda idx=i: nextPage(idx)
+    )
+    btn.place(relx=relx, rely=rely)
+    btn.bind("<Enter>", lambda event, idx=i: hoverMenuButtons(event, idx))
+    btn.bind("<Leave>", lambda event, idx=i: leaveMenuButtons(event, idx))
+    buttonsMain.append(btn)
 
-)
-
-
-buttonsMain[0].place(
-    relx=0.07,
-    rely=0.4
-)
-
-
-buttonsMain[1] = Button(
-    root,
-    text="Security",
-    font=("Lucida Sans",12, "bold"),
-    fg=active_color,
-    bg= backgroundColor,
-    activebackground=backgroundColor,
-    highlightthickness=0,
-    borderwidth=0,
-    command = lambda : nextPage(1)
-)
-
-buttonsMain[1].place(
-    relx=0.075,
-    rely=0.45
-)
-
-
-buttonsMain[2] = Button(
-    root,
-    text="Update",
-    font=("Lucida Sans",12),
-    fg=not_active_color,
-    bg= backgroundColor,
-    activebackground=backgroundColor,
-    highlightthickness=0,
-    borderwidth=0,
-    command=lambda: nextPage(2)
-
-)
-
-buttonsMain[2].place(
-    relx=0.075,
-    rely=0.50
-)
-
-
-
-buttonsMain[3] = Button(
-    root,
-    text="Tasks",
-    font=("Lucida Sans",12),
-    fg=not_active_color,
-    bg= backgroundColor,
-    activebackground=backgroundColor,
-    highlightthickness=0,
-    borderwidth=0,
-    command=lambda: nextPage(3)
-
-)
-
-buttonsMain[3].place(
-    relx=0.078,
-    rely=0.55
-)
-
-
-buttonsMain[4] = Button(
-    root,
-    text="License",
-    font=("Lucida Sans",12),
-    fg=not_active_color,
-    bg= backgroundColor,
-    activebackground= backgroundColor,
-    highlightthickness=0,
-    borderwidth=0,
-    command=lambda: nextPage(4)
-
-)
-
-buttonsMain[4].place(
-    relx=0.074,
-    rely=0.595
-)
-
-
-
-buttonsMain[0].bind("<Enter>", lambda event, i=0: hoverMenuButtons(event, i))
-buttonsMain[0].bind("<Leave>", lambda event, i=0: leaveMenuButtons(event, i))
-
-
-
-buttonsMain[1].bind("<Enter>", lambda event, i=1: hoverMenuButtons(event, i))
-buttonsMain[1].bind("<Leave>", lambda event, i=1: leaveMenuButtons(event, i))
-
-buttonsMain[2].bind("<Enter>", lambda event, i=2: hoverMenuButtons(event, i))
-buttonsMain[2].bind("<Leave>", lambda event, i=2: leaveMenuButtons(event, i))
-
-buttonsMain[3].bind("<Enter>", lambda event, i=3: hoverMenuButtons(event, i))
-buttonsMain[3].bind("<Leave>", lambda event, i=3: leaveMenuButtons(event, i))
-
-buttonsMain[4].bind("<Enter>", lambda event, i=4: hoverMenuButtons(event, i))
-buttonsMain[4].bind("<Leave>", lambda event, i=4: leaveMenuButtons(event, i))
-
+# Show the Security page (AnubisApp) by default
+show_page("security")
 
 root.mainloop()
+
