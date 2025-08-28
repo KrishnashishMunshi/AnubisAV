@@ -192,7 +192,7 @@ def scanner():
     start_button.pack(pady=10)
 
 # ------------------- Left Panel -------------------
-image_frame = ImageTk.PhotoImage(Image.open("1x/Panel.png"))
+image_frame = ImageTk.PhotoImage(Image.open("../assets/1x/Panel.png"))
 main_frame = tk.Frame(root, bg="black", width=275, height=720)
 main_frame.pack(side=tk.LEFT, fill=tk.Y)
 main_frame.pack_propagate(False)
@@ -201,7 +201,7 @@ label = tk.Label(main_frame, image=image_frame, borderwidth=0)
 label.pack()
 
 # Scan button
-img_scan = ImageTk.PhotoImage(Image.open("1x/scan.png"))
+img_scan = ImageTk.PhotoImage(Image.open("../assets/1x/scan.png"))
 tk.Button(root, image=img_scan, bg=backgroundColor, width=671, borderwidth=0, height=436,
           command=scanner, activebackground=backgroundColor).place(relx=0.35, rely=0.16)
 
