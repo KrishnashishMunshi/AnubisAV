@@ -4,3 +4,6 @@ signify
 scikit-learn
 polars
 huggingface_hub
+psutil
+Pillow
+lightgbm

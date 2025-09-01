@@ -14,4 +14,4 @@ venv/
 # Model artifacts (optional if too large)
 models/*.txt
 models/*.model
-
+EMBER2024_all.model

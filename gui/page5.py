@@ -1,5 +1,5 @@
 import webbrowser
-import cv2
+
 import psutil
 from tkinter import *
 import tkinter as tk

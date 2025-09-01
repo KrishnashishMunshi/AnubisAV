@@ -5,10 +5,13 @@ from PIL import ImageTk, Image
 import threading
 import time
 import random
-import os
+import os, sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from classify import initialize_classifier, get_malice_score
 
 thisPage = 2
-
+initialize_classifier()
 root = tk.Tk()
 root.title("Anubis Antivirus")
 root.geometry("1270x720")
@@ -86,13 +89,34 @@ def nextPage(i):
         import page5
 
 # ------------------- Modern Scan UI from Code 2 -------------------
+# --- Main Scanner Window Function ---
 def scanner():
+    # --- Define Colors and Messages ---
+    # (Assuming these are defined somewhere, or you can define them here)
+    backgroundColor = "#2b2b2b"
+    active_color = "#cccccc"
+    LOG_MESSAGES = [
+        "Initializing scan engine...",
+        "Parsing PE headers...",
+        "Analyzing import address table...",
+        "Scanning .text section...",
+        "Checking for known signatures...",
+        "Analyzing resource section...",
+        "Heuristic analysis in progress...",
+        "Finalizing feature extraction...",
+        "Sending data to classifier...",
+        "Compiling final report..."
+    ]
+
     selected_file = {"path": None}
     scanning = {"status": False}
     elapsed_time = {"seconds": 0}
 
     def browse_file():
-        path = filedialog.askopenfilename()
+        path = filedialog.askopenfilename(
+            title="Select a Windows Executable",
+            filetypes=[("Executable files", "*.exe"), ("All files", "*.*")]
+        )
         if path:
             selected_file["path"] = path
             file_label.config(text=f"File: {os.path.basename(path)}", fg=active_color)
@@ -100,96 +124,112 @@ def scanner():
 
     def update_system_stats():
         while scanning["status"]:
-            cpu = psutil.cpu_percent(interval=0.5)
-            mem = psutil.virtual_memory().percent
-            cpu_label.config(text=f"CPU Usage: {cpu}%")
-            mem_label.config(text=f"Memory Usage: {mem}%")
-            time.sleep(0.5)
+            try:
+                cpu = psutil.cpu_percent(interval=0.5)
+                mem = psutil.virtual_memory().percent
+                cpu_label.config(text=f"CPU Usage: {cpu}%")
+                mem_label.config(text=f"Memory Usage: {mem}%")
+                time.sleep(0.5)
+            except (tk.TclError, RuntimeError): # Catch errors if window is closed
+                break
 
     def update_timer():
         while scanning["status"]:
-            time.sleep(1)
-            elapsed_time["seconds"] += 1
-            mins, secs = divmod(elapsed_time["seconds"], 60)
-            timer_label.config(text=f"Elapsed Time: {mins:02}:{secs:02}")
+            try:
+                time.sleep(1)
+                elapsed_time["seconds"] += 1
+                mins, secs = divmod(elapsed_time["seconds"], 60)
+                timer_label.config(text=f"Elapsed Time: {mins:02}:{secs:02}")
+            except (tk.TclError, RuntimeError):
+                break
 
-    def simulate_scan():
+    def run_analysis():
+        """Calls the backend, stops the UI monitors, and displays the result."""
+        log_box.config(state="normal")
+        log_box.insert(tk.END, "> Running ML model...\n")
+        log_box.see(tk.END)
+        score = get_malice_score(selected_file["path"])
+
+        scanning["status"] = False
+        progress_bar.stop()
+        progress_bar['mode'] = 'determinate'
+        progress_bar["value"] = 100
+        progress_label.config(text="Scan Complete")
+        log_box.insert(tk.END, "> Analysis finished.\n")
+        log_box.see(tk.END)
+        log_box.config(state="disabled")
+
+        if score is None:
+            result_label.config(text=f"Error analyzing file.", fg="orange")
+        elif score == -1.0:
+            result_label.config(text=f"File is not a valid Windows executable.", fg="orange")
+        elif score > 0.7:
+            result_label.config(text=f"Threat DETECTED! Malice Score: {score:.4f}", fg="#ff4d4d")
+        else:
+            result_label.config(text=f"No threats found. Malice Score: {score:.4f}", fg="#4dff4d")
+
+        start_button.config(state="normal")
+
+    def start_scan_thread():
+        """Prepares the UI and starts the analysis in a new thread."""
         if not selected_file["path"]:
             return
+
         scanning["status"] = True
         elapsed_time["seconds"] = 0
+        start_button.config(state="disabled")
 
-        # Clear UI
-        progress_bar["value"] = 0
+        result_label.config(text="Analyzing...", fg=active_color)
+        timer_label.config(text="Elapsed Time: 00:00")
+        progress_label.config(text="Current Progress: Analyzing...")
         log_box.config(state="normal")
         log_box.delete("1.0", tk.END)
-        result_label.config(text="")
-        timer_label.config(text="Elapsed Time: 00:00")
+        log_box.insert(tk.END, f"> Starting scan for: {os.path.basename(selected_file['path'])}\n")
+        log_box.config(state="disabled")
+
+        progress_bar['mode'] = 'indeterminate'
+        progress_bar.start(10)
 
         threading.Thread(target=update_system_stats, daemon=True).start()
         threading.Thread(target=update_timer, daemon=True).start()
+        threading.Thread(target=run_analysis, daemon=True).start()
 
-        for i in range(101):
-            time.sleep(0.05)
-            progress_bar["value"] = i
-            progress_label.config(text=f"Current Progress: {i}%")
-            if i % 10 == 0 and i // 10 < len(LOG_MESSAGES):
-                log_box.insert(tk.END, f"> {LOG_MESSAGES[i // 10]}\n")
-                log_box.see(tk.END)
-        log_box.config(state="disabled")
-
-        scanning["status"] = False
-
-        score = random.randint(0, 100)
-        if score > 70:
-            result_label.config(text=f"Threat detected in {os.path.basename(selected_file['path'])}! Score: {score}", fg="red")
-        else:
-            result_label.config(text=f"No threats found in {os.path.basename(selected_file['path'])}. Score: {score}", fg="green")
-
+    # --- GUI Widget Setup (Corrected Syntax) ---
     top = tk.Toplevel()
-    top.title("Scanning")
+    top.title("AnubisAV Static Analysis")
     top.geometry("800x650")
     top.configure(bg=backgroundColor)
 
-    # File upload
-    upload_btn = tk.Button(top, text="Select File", font=("Lucida Sans", 12), fg=active_color, bg=backgroundColor,
-                           command=browse_file)
+    upload_btn = tk.Button(top, text="Select File", font=("Lucida Sans", 12), fg=active_color, bg=backgroundColor, command=browse_file)
     upload_btn.pack(pady=10)
 
     file_label = tk.Label(top, text="No file selected", font=("Lucida Sans", 12), fg="grey", bg=backgroundColor)
     file_label.pack()
 
-    # Progress bar
     progress_bar = ttk.Progressbar(top, orient='horizontal', mode='determinate', length=500)
     progress_bar.pack(pady=10)
 
     progress_label = tk.Label(top, text="Current Progress: 0%", font=("Lucida Sans", 12), fg=active_color, bg=backgroundColor)
     progress_label.pack()
 
-    # CPU & Memory usage
     cpu_label = tk.Label(top, text="CPU Usage: 0%", font=("Lucida Sans", 12), fg=active_color, bg=backgroundColor)
     cpu_label.pack()
 
     mem_label = tk.Label(top, text="Memory Usage: 0%", font=("Lucida Sans", 12), fg=active_color, bg=backgroundColor)
     mem_label.pack()
 
-    # Elapsed time
     timer_label = tk.Label(top, text="Elapsed Time: 00:00", font=("Lucida Sans", 12), fg=active_color, bg=backgroundColor)
     timer_label.pack()
 
-    # Log box
-    log_box = tk.Text(top, height=15, bg="#1a1a1a", fg="white", font=("Consolas", 10))
-    log_box.pack(pady=10)
+    log_box = tk.Text(top, height=15, bg="#1a1a1a", fg="white", font=("Consolas", 10), state="disabled")
+    log_box.pack(pady=10, padx=20, fill="x")
 
-    # Result label
-    result_label = tk.Label(top, text="", font=("Lucida Sans", 12), fg=active_color, bg=backgroundColor)
-    result_label.pack()
+    result_label = tk.Label(top, text="", font=("Lucida Sans", 14, "bold"), bg=backgroundColor)
+    result_label.pack(pady=10)
 
-    # Start scan button
-    start_button = tk.Button(top, text="Start Scan", fg=active_color, bg=backgroundColor, font=("Lucida Sans", 12),
-                             command=lambda: threading.Thread(target=simulate_scan, daemon=True).start(),
-                             state="disabled")
+    start_button = tk.Button(top, text="Start Scan", fg=active_color, bg=backgroundColor, font=("Lucida Sans", 12), command=start_scan_thread, state="disabled")
     start_button.pack(pady=10)
+
 
 # ------------------- Left Panel -------------------
 image_frame = ImageTk.PhotoImage(Image.open("../assets/1x/Panel.png"))
